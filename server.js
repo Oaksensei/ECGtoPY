@@ -1,18 +1,37 @@
-const WebSocket = require("ws");
+const http = require("http");
+const { Server } = require("socket.io");
 
-const PORT = process.env.PORT || 8080;
-const wss = new WebSocket.Server({ port: PORT });
+const PORT = process.env.PORT || 10000;
 
-console.log("WebSocket server running on port", PORT);
+// สร้าง HTTP server
+const server = http.createServer();
 
-wss.on("connection", (ws) => {
-  console.log("Client connected");
+// ผูก socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Expo / Mobile
+    methods: ["GET", "POST"],
+  },
+});
 
-  ws.on("message", (message) => {
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message.toString());
-      }
-    });
+console.log("Socket.IO server starting...");
+
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+
+  // รับ ECG packet จาก Python
+  socket.on("ecg", (data) => {
+    console.log("RECEIVED ECG:", JSON.stringify(data).slice(0, 80));
+
+    // broadcast ไป client ทุกตัว (รวม Expo)
+    socket.broadcast.emit("ecg", data);
   });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log("Socket.IO server running on port", PORT);
 });
